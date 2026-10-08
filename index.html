@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Trivia Quiz</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-color: #ffffff;
+            --primary-color: #4a90e2;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --text-color: #2c3e50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .quiz-container {
+            background-color: var(--card-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 550px;
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .active {
+            display: block;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            background-color: #357abd;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .difficulty-btn {
+            text-transform: capitalize;
+            font-weight: bold;
+        }
+
+        .difficulty-btn.easy { background-color: #2ecc71; }
+        .difficulty-btn.easy:hover { background-color: #27ae60; }
+        .difficulty-btn.medium { background-color: #f39c12; }
+        .difficulty-btn.medium:hover { background-color: #d35400; }
+        .difficulty-btn.hard { background-color: #e74c3c; }
+        .difficulty-btn.hard:hover { background-color: #c0392b; }
+
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .question-text {
+            font-size: 18px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .option-btn {
+            background-color: #ecf0f1;
+            color: var(--text-color);
+            text-align: left;
+        }
+
+        .option-btn:hover {
+            background-color: #d5dbdb;
+        }
+
+        .option-btn.correct {
+            background-color: var(--success-color) !important;
+            color: white;
+        }
+
+        .option-btn.wrong {
+            background-color: var(--error-color) !important;
+            color: white;
+        }
+
+        .score-display {
+            font-size: 24px;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .loader {
+            text-align: center;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+
+<div class="quiz-container">
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="screen active">
+        <h1>Trivia Quiz</h1>
+        <p style="text-align: center;">Select a difficulty level to begin:</p>
+        <div class="btn-group">
+            <button class="difficulty-btn easy" onclick="startQuiz('easy')">Easy</button>
+            <button class="difficulty-btn medium" onclick="startQuiz('medium')">Medium</button>
+            <button class="difficulty-btn hard" onclick="startQuiz('hard')">Hard</button>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="screen">
+        <div class="loader">Fetching questions from API...</div>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quiz-screen" class="screen">
+        <div class="quiz-header">
+            <span id="progress-text">Question 1 of 10</span>
+            <span id="score-text">Score: 0</span>
+        </div>
+        <div id="question" class="question-text">Loading question...</div>
+        <div id="options" class="btn-group">
+            <!-- Options dynamically added here -->
+        </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="screen">
+        <h1>Quiz Completed!</h1>
+        <div class="score-display" id="final-score">Your Score: 0 / 10</div>
+        <div class="btn-group">
+            <button onclick="restartQuiz()">Play Again</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let questions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    const totalQuestions = 10;
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    async function startQuiz(difficulty) {
+        showScreen('loading-screen');
+        score = 0;
+        currentQuestionIndex = 0;
+        
+        // Open Trivia DB API URL
+        const apiUrl = `https://opentdb.com{totalQuestions}&difficulty=${difficulty}&type=multiple`;
+        
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            
+            if(data.response_code === 0) {
+                questions = data.results;
+                showScreen('quiz-screen');
+                loadQuestion();
+            } else {
+                alert("Failed to load questions. Please try again.");
+                showScreen('setup-screen');
+            }
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            alert("Network error. Please try again later.");
+            showScreen('setup-screen');
+        }
+    }
+
+    // Helper function to decode HTML entities returned by the API
+    function decodeHtml(html) {
+        var txt = document.createElement("textarea");
+        txt.innerHTML = html;
+        return txt.value;
+    }
+
+    function loadQuestion() {
+        const currentQuestion = questions[currentQuestionIndex];
+        
+        // Update header UI
+        document.getElementById('progress-text').innerText = `Question ${currentQuestionIndex + 1} of ${totalQuestions}`;
+        document.getElementById('score-text').innerText = `Score: ${score}`;
+        
+        // Set question text
+        document.getElementById('question').innerText = decodeHtml(currentQuestion.question);
+        
+        // Combine, shuffle, and decode choices
+        const optionsContainer = document.getElementById('options');
+        optionsContainer.innerHTML = '';
+        
+        const choices = [...currentQuestion.incorrect_answers, currentQuestion.correct_answer];
+        // Fisher-Yates Shuffle
+        choices.sort(() => Math.random() - 0.5);
+
+        choices.forEach(choice => {
+            const button = document.createElement('button');
+            button.className = 'option-btn';
+            button.innerText = decodeHtml(choice);
+            button.onclick = () => selectAnswer(button, choice, currentQuestion.correct_answer);
+            optionsContainer.appendChild(button);
+        });
+    }
+
+    function selectAnswer(selectedButton, chosenAnswer, correctAnswer) {
+        const buttons = document.querySelectorAll('.option-btn');
+        // Disable all buttons immediately to prevent double clicking
+        buttons.forEach(btn => btn.disabled = true);
+
+        if (chosenAnswer === correctAnswer) {
+            selectedButton.classList.add('correct');
+            score++;
+            document.getElementById('score-text').innerText = `Score: ${score}`;
+        } else {
+            selectedButton.classList.add('wrong');
+            // Show the correct answer in green highlight
+            buttons.forEach(btn => {
+                if (btn.innerText === decodeHtml(correctAnswer)) {
+                    btn.classList.add('correct');
+                }
+            });
+        }
+
+        // Wait 1.5 seconds so user sees the answer validation before advancing
+        setTimeout(() => {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < totalQuestions) {
+                loadQuestion();
+            } else {
+                endQuiz();
+            }
+        }, 1500);
+    }
+
+    function endQuiz() {
+        showScreen('end-screen');
+        document.getElementById('final-score').innerText = `Your Score: ${score} / ${totalQuestions}`;
+    }
+
+    function restartQuiz() {
+        showScreen('setup-screen');
+    }
+</script>
+</body>
+</html>
